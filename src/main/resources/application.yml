@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: byz-directory
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5435/directory}
+    username: ${DB_USER:db}
+    password: ${DB_PASS:db}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: directory
+  flyway:
+    schemas: directory
+    default-schema: directory
+    create-schemas: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IAM_JWKS_URL:https://iam.byzantineapp.dev/.well-known/jwks.json}
+
+server:
+  port: ${PORT:8086}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  pattern:
+    console: '{"time":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","service":"byz-directory","logger":"%logger{36}","msg":"%msg"}%n'
