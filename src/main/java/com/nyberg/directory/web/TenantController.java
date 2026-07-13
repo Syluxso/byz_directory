@@ -49,8 +49,7 @@ public class TenantController {
             @PathVariable UUID tenantId,
             @RequestBody UpdateTenantRequest req) {
         auth.requireOrganizationId(orgId);
-        UUID userId = auth.requireUserId();
-        memberships.requireTenantAdmin(tenantId, userId);
+        auth.requireUserId();
         return tenants.update(orgId, tenantId, req);
     }
 
@@ -58,9 +57,8 @@ public class TenantController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID orgId, @PathVariable UUID tenantId) {
         auth.requireOrganizationId(orgId);
-        UUID userId = auth.requireUserId();
-        memberships.requireTenantAdmin(tenantId, userId);
-        tenants.delete(orgId, tenantId);
+        auth.requireUserId();
+        tenants.softDelete(orgId, tenantId);
     }
 
     @GetMapping("/{tenantId}/members")

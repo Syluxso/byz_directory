@@ -1,16 +1,15 @@
 package com.nyberg.directory.service;
 
 import com.nyberg.directory.domain.DirTenant;
-import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
 import com.nyberg.directory.repository.DirTenantRepository;
-import com.nyberg.directory.repository.MembershipRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -20,11 +19,12 @@ import java.util.UUID;
 public class TenantService {
 
     private final DirTenantRepository tenants;
-    private final MembershipRepository memberships;
 
     @Transactional(readOnly = true)
     public List<TenantResponse> list(UUID organizationId) {
-        return tenants.findByOrganizationIdOrderByNameAsc(organizationId).stream().map(this::toResponse).toList();
+        return tenants.findByOrganizationIdAndDeletedAtIsNullOrderByNameAsc(organizationId).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -40,19 +40,10 @@ public class TenantService {
         DirTenant tenant = tenants.save(DirTenant.builder()
                 .organizationId(organizationId)
                 .name(req.name().trim())
-                .slug(slug)
+                .slug(slug.isBlank() ? null : slug)
                 .description(blankToNull(req.description()))
                 .createdBy(createdBy)
                 .build());
-
-        // Creator becomes tenant admin.
-        memberships.save(Membership.builder()
-                .tenantId(tenant.getId())
-                .userId(createdBy)
-                .organizationId(organizationId)
-                .role("admin")
-                .build());
-
         return toResponse(tenant);
     }
 
@@ -63,7 +54,8 @@ public class TenantService {
             tenant.setName(req.name().trim());
         }
         if (req.slug() != null) {
-            tenant.setSlug(req.slug().isBlank() ? null : slugify(req.slug()));
+            String slug = req.slug().isBlank() ? null : slugify(req.slug());
+            tenant.setSlug(slug == null || slug.isBlank() ? null : slug);
         }
         if (req.description() != null) {
             tenant.setDescription(blankToNull(req.description()));
@@ -72,13 +64,14 @@ public class TenantService {
     }
 
     @Transactional
-    public void delete(UUID organizationId, UUID tenantId) {
+    public void softDelete(UUID organizationId, UUID tenantId) {
         DirTenant tenant = requireTenant(organizationId, tenantId);
-        tenants.delete(tenant);
+        tenant.setDeletedAt(Instant.now());
+        tenants.save(tenant);
     }
 
     public DirTenant requireTenant(UUID organizationId, UUID tenantId) {
-        return tenants.findByIdAndOrganizationId(tenantId, organizationId)
+        return tenants.findByIdAndOrganizationIdAndDeletedAtIsNull(tenantId, organizationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
     }
 
