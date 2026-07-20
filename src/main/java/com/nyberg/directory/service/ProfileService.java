@@ -24,6 +24,7 @@ public class ProfileService {
     private final ProfileRepository profiles;
     private final OrganizationProfileRepository orgProfiles;
     private final CardService cards;
+    private final OrgRoleService orgRoles;
 
     @Transactional(readOnly = true)
     public OrgProfileResponse getOrgProfile(UUID organizationId) {
@@ -59,7 +60,7 @@ public class ProfileService {
     @Transactional
     public ProfileResponse ensureProfile(UUID userId, UUID organizationId, EnsureProfileRequest req) {
         return profiles.findByUserIdAndOrganizationId(userId, organizationId)
-                .map(this::toProfileResponse)
+                .map(existing -> toProfileResponse(orgRoles.promoteToAdminIfNoAdminExists(existing)))
                 .orElseGet(() -> {
                     String email = normalizeEmail(req.email());
                     if (profiles.existsByOrganizationIdAndEmailIgnoreCase(organizationId, email)) {
@@ -75,6 +76,7 @@ public class ProfileService {
                             .organizationId(organizationId)
                             .email(email)
                             .displayName(display)
+                            .orgRole(orgRoles.resolveRoleForNewProfile(organizationId))
                             .metadata(req.metadata())
                             .build());
                     return toProfileResponse(created);
@@ -152,6 +154,7 @@ public class ProfileService {
                 p.getOrganizationId(),
                 p.getEmail(),
                 p.getDisplayName(),
+                p.getOrgRole() != null ? p.getOrgRole() : "member",
                 cards.toContactResponse(p.getContactCardId()),
                 cards.toAddressResponse(p.getAddressCardId()),
                 p.getMetadata(),

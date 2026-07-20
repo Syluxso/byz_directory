@@ -3,6 +3,7 @@ package com.nyberg.directory.web;
 import com.nyberg.directory.dto.DirectoryDtos.*;
 import com.nyberg.directory.security.AuthSupport;
 import com.nyberg.directory.service.MembershipService;
+import com.nyberg.directory.service.OrgRoleService;
 import com.nyberg.directory.service.ProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class ProfileController {
 
     private final ProfileService profiles;
     private final MembershipService memberships;
+    private final OrgRoleService orgRoles;
     private final AuthSupport auth;
 
     @GetMapping("/orgs/{orgId}/profile")
@@ -29,7 +31,7 @@ public class ProfileController {
     @PutMapping("/orgs/{orgId}/profile")
     public OrgProfileResponse upsertOrgProfile(@PathVariable UUID orgId, @RequestBody OrgProfileRequest req) {
         auth.requireOrganizationId(orgId);
-        auth.requireUserId();
+        orgRoles.requireOrgAdmin(auth.requireUserId(), orgId);
         return profiles.upsertOrgProfile(orgId, req);
     }
 

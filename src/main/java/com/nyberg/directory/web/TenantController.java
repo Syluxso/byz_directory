@@ -3,6 +3,7 @@ package com.nyberg.directory.web;
 import com.nyberg.directory.dto.DirectoryDtos.*;
 import com.nyberg.directory.security.AuthSupport;
 import com.nyberg.directory.service.MembershipService;
+import com.nyberg.directory.service.OrgRoleService;
 import com.nyberg.directory.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class TenantController {
 
     private final TenantService tenants;
     private final MembershipService memberships;
+    private final OrgRoleService orgRoles;
     private final AuthSupport auth;
 
     @GetMapping
@@ -40,7 +42,24 @@ public class TenantController {
     public TenantResponse create(@PathVariable UUID orgId, @Valid @RequestBody CreateTenantRequest req) {
         auth.requireOrganizationId(orgId);
         UUID userId = auth.requireUserId();
+        orgRoles.requireOrgAdmin(userId, orgId);
         return tenants.create(orgId, userId, req);
+    }
+
+    /**
+     * Signup bootstrap: JWT tenant_id must match body.id. Creates the directory tenant if missing
+     * and ensures the caller is a member (admin if first).
+     */
+    @PostMapping("/ensure")
+    public TenantResponse ensure(@PathVariable UUID orgId, @Valid @RequestBody EnsureTenantRequest req) {
+        auth.requireOrganizationId(orgId);
+        UUID userId = auth.requireUserId();
+        UUID jwtTenant = auth.requireTenantId();
+        if (!jwtTenant.equals(req.id())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "tenant id must match token tenant_id");
+        }
+        return tenants.ensure(orgId, userId, req);
     }
 
     @PutMapping("/{tenantId}")
@@ -49,7 +68,7 @@ public class TenantController {
             @PathVariable UUID tenantId,
             @RequestBody UpdateTenantRequest req) {
         auth.requireOrganizationId(orgId);
-        auth.requireUserId();
+        orgRoles.requireOrgAdmin(auth.requireUserId(), orgId);
         return tenants.update(orgId, tenantId, req);
     }
 
@@ -57,7 +76,7 @@ public class TenantController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID orgId, @PathVariable UUID tenantId) {
         auth.requireOrganizationId(orgId);
-        auth.requireUserId();
+        orgRoles.requireOrgAdmin(auth.requireUserId(), orgId);
         tenants.softDelete(orgId, tenantId);
     }
 

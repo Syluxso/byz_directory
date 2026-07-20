@@ -19,6 +19,7 @@ public class MembershipService {
 
     private final MembershipRepository memberships;
     private final TenantService tenants;
+    private final OrgRoleService orgRoles;
 
     @Transactional(readOnly = true)
     public List<MembershipResponse> listMembers(UUID organizationId, UUID tenantId) {
@@ -34,7 +35,7 @@ public class MembershipService {
     @Transactional
     public MembershipResponse addMember(UUID organizationId, UUID tenantId, UUID actorUserId, AddMemberRequest req) {
         tenants.requireTenant(organizationId, tenantId);
-        requireTenantAdmin(tenantId, actorUserId);
+        requireTenantAdminOrOrgAdmin(organizationId, tenantId, actorUserId);
         String role = normalizeRole(req.role());
         if (memberships.existsByTenantIdAndUserId(tenantId, req.userId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "User already a member");
@@ -51,7 +52,7 @@ public class MembershipService {
     @Transactional
     public MembershipResponse updateRole(UUID organizationId, UUID tenantId, UUID targetUserId, UUID actorUserId, UpdateMemberRoleRequest req) {
         tenants.requireTenant(organizationId, tenantId);
-        requireTenantAdmin(tenantId, actorUserId);
+        requireTenantAdminOrOrgAdmin(organizationId, tenantId, actorUserId);
         Membership m = memberships.findByTenantIdAndUserId(tenantId, targetUserId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
         m.setRole(normalizeRole(req.role()));
@@ -61,7 +62,7 @@ public class MembershipService {
     @Transactional
     public void removeMember(UUID organizationId, UUID tenantId, UUID targetUserId, UUID actorUserId) {
         tenants.requireTenant(organizationId, tenantId);
-        requireTenantAdmin(tenantId, actorUserId);
+        requireTenantAdminOrOrgAdmin(organizationId, tenantId, actorUserId);
         if (!memberships.existsByTenantIdAndUserId(tenantId, targetUserId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found");
         }
@@ -76,10 +77,22 @@ public class MembershipService {
         }
     }
 
+    /** Org admins can bootstrap team management even without a tenant membership. */
+    public void requireTenantAdminOrOrgAdmin(UUID organizationId, UUID tenantId, UUID userId) {
+        if (orgRoles.isOrgAdmin(userId, organizationId)) {
+            return;
+        }
+        requireTenantAdmin(tenantId, userId);
+    }
+
     public boolean isTenantAdmin(UUID tenantId, UUID userId) {
         return memberships.findByTenantIdAndUserId(tenantId, userId)
                 .map(m -> "admin".equals(m.getRole()))
                 .orElse(false);
+    }
+
+    public boolean canManageTenant(UUID organizationId, UUID tenantId, UUID userId) {
+        return orgRoles.isOrgAdmin(userId, organizationId) || isTenantAdmin(tenantId, userId);
     }
 
     MembershipResponse toResponse(Membership m) {

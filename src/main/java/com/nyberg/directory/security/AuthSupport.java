@@ -1,6 +1,7 @@
 package com.nyberg.directory.security;
 
 import com.nyberg.directory.tenant.OrganizationContext;
+import com.nyberg.directory.tenant.TenantContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,6 +36,28 @@ public class AuthSupport {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Organization mismatch");
         }
         return tokenOrg;
+    }
+
+    public UUID requireTenantId() {
+        // JwtToUuidConverter stores tenant_id on TenantContext; Spring often erases
+        // UsernamePasswordAuthenticationToken credentials after auth, so prefer context.
+        UUID fromCtx = TenantContext.get();
+        if (fromCtx != null) {
+            return fromCtx;
+        }
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT required");
+        }
+        String raw = jwt.getClaimAsString("tenant_id");
+        if (raw == null || raw.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "tenant_id missing from token");
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tenant_id in token");
+        }
     }
 
     public boolean isServiceToken() {

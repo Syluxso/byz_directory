@@ -91,6 +91,7 @@ public final class DirectoryDtos {
             UUID organizationId,
             String email,
             String displayName,
+            String orgRole,
             ContactCardResponse contact,
             AddressCardResponse address,
             Map<String, Object> metadata,
@@ -99,6 +100,14 @@ public final class DirectoryDtos {
     ) {}
 
     public record CreateTenantRequest(
+            @NotBlank String name,
+            String slug,
+            String description
+    ) {}
+
+    /** Bootstrap: create tenant with a specific IAM tenant id if missing; add caller as admin. */
+    public record EnsureTenantRequest(
+            @NotNull UUID id,
             @NotBlank String name,
             String slug,
             String description

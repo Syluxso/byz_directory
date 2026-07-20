@@ -3,3 +3,11 @@ spring:
     url: jdbc:postgresql://127.0.0.1:5435/directory
     username: db
     password: db
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8082/.well-known/jwks.json
+
+server:
+  port: 8086

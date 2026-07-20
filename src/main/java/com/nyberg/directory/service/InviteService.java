@@ -35,7 +35,7 @@ public class InviteService {
     @Transactional
     public InviteResponse create(UUID organizationId, UUID tenantId, UUID invitedBy, CreateInviteRequest req) {
         tenants.requireTenant(organizationId, tenantId);
-        membershipService.requireTenantAdmin(tenantId, invitedBy);
+        membershipService.requireTenantAdminOrOrgAdmin(organizationId, tenantId, invitedBy);
 
         String email = normalizeEmail(req.email());
         String role = MembershipService.normalizeRole(req.role());
@@ -106,7 +106,7 @@ public class InviteService {
     @Transactional
     public InviteResponse revoke(UUID organizationId, UUID tenantId, UUID inviteId, UUID actorUserId) {
         tenants.requireTenant(organizationId, tenantId);
-        membershipService.requireTenantAdmin(tenantId, actorUserId);
+        membershipService.requireTenantAdminOrOrgAdmin(organizationId, tenantId, actorUserId);
         Invite invite = invites.findById(inviteId)
                 .filter(i -> i.getTenantId().equals(tenantId) && i.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invite not found"));

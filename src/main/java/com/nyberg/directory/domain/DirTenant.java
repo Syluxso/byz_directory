@@ -16,7 +16,6 @@ import java.util.UUID;
 public class DirTenant {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "organization_id", nullable = false)
@@ -42,6 +41,9 @@ public class DirTenant {
 
     @PrePersist
     void onCreate() {
+        if (id == null) {
+            id = UUID.randomUUID();
+        }
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;

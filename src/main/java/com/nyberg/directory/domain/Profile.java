@@ -34,6 +34,9 @@ public class Profile {
     @Column(name = "display_name")
     private String displayName;
 
+    @Column(name = "org_role", nullable = false)
+    private String orgRole;
+
     @Column(name = "contact_card_id")
     private UUID contactCardId;
 
@@ -54,6 +57,9 @@ public class Profile {
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
+        if (orgRole == null || orgRole.isBlank()) {
+            orgRole = "member";
+        }
     }
 
     @PreUpdate

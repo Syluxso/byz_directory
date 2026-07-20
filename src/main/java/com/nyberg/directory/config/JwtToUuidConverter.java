@@ -37,6 +37,14 @@ public class JwtToUuidConverter implements Converter<Jwt, AbstractAuthentication
             } catch (IllegalArgumentException ignored) {}
         }
 
-        return new UsernamePasswordAuthenticationToken(userId, jwt, List.of());
+        // Keep Jwt as credentials; disable erase so AuthSupport.jwtOrNull() still works.
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(userId, jwt, List.of()) {
+                    @Override
+                    public void eraseCredentials() {
+                        // no-op: retain Jwt for claim access (tenant_id, grant_type)
+                    }
+                };
+        return auth;
     }
 }

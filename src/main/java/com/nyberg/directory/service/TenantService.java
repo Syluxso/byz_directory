@@ -1,8 +1,10 @@
 package com.nyberg.directory.service;
 
 import com.nyberg.directory.domain.DirTenant;
+import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
 import com.nyberg.directory.repository.DirTenantRepository;
+import com.nyberg.directory.repository.MembershipRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -19,6 +22,7 @@ import java.util.UUID;
 public class TenantService {
 
     private final DirTenantRepository tenants;
+    private final MembershipRepository memberships;
 
     @Transactional(readOnly = true)
     public List<TenantResponse> list(UUID organizationId) {
@@ -44,6 +48,50 @@ public class TenantService {
                 .description(blankToNull(req.description()))
                 .createdBy(createdBy)
                 .build());
+        // Creator becomes tenant admin so they can invite / manage the team immediately.
+        if (createdBy != null && !memberships.existsByTenantIdAndUserId(tenant.getId(), createdBy)) {
+            memberships.save(Membership.builder()
+                    .tenantId(tenant.getId())
+                    .userId(createdBy)
+                    .organizationId(organizationId)
+                    .role("admin")
+                    .build());
+        }
+        return toResponse(tenant);
+    }
+
+    /**
+     * Idempotent bootstrap for signup: create tenant with the given IAM tenant id (if absent)
+     * and ensure the caller is a tenant admin. JWT tenant_id must match {@code req.id()}.
+     */
+    @Transactional
+    public TenantResponse ensure(UUID organizationId, UUID callerUserId, EnsureTenantRequest req) {
+        Optional<DirTenant> existing = tenants.findByIdAndOrganizationIdAndDeletedAtIsNull(req.id(), organizationId);
+        DirTenant tenant;
+        if (existing.isPresent()) {
+            tenant = existing.get();
+        } else {
+            String slug = req.slug() != null && !req.slug().isBlank()
+                    ? slugify(req.slug())
+                    : slugify(req.name());
+            tenant = tenants.save(DirTenant.builder()
+                    .id(req.id())
+                    .organizationId(organizationId)
+                    .name(req.name().trim())
+                    .slug(slug.isBlank() ? null : slug)
+                    .description(blankToNull(req.description()))
+                    .createdBy(callerUserId)
+                    .build());
+        }
+        if (callerUserId != null && !memberships.existsByTenantIdAndUserId(tenant.getId(), callerUserId)) {
+            boolean firstMember = memberships.findByTenantId(tenant.getId()).isEmpty();
+            memberships.save(Membership.builder()
+                    .tenantId(tenant.getId())
+                    .userId(callerUserId)
+                    .organizationId(organizationId)
+                    .role(firstMember ? "admin" : "user")
+                    .build());
+        }
         return toResponse(tenant);
     }
 
