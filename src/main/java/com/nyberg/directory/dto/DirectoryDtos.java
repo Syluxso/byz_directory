@@ -175,4 +175,45 @@ public final class DirectoryDtos {
             int matched,
             int accepted
     ) {}
+
+    // ── Guided / system tasks ─────────────────────────────────────────────────
+
+    public record CreateGuidedTaskRequest(
+            /** Required when using a service token; ignored for user JWT (always self). */
+            UUID subjectUserId,
+            @NotBlank String type,
+            String status,
+            String priority,
+            String title,
+            String body,
+            String actionUrl,
+            Map<String, Object> payload,
+            String source,
+            String dedupeKey,
+            UUID tenantId
+    ) {}
+
+    public record UpdateGuidedTaskStatusRequest(
+            @NotBlank String status
+    ) {}
+
+    public record GuidedTaskResponse(
+            UUID id,
+            UUID organizationId,
+            UUID tenantId,
+            UUID subjectUserId,
+            String type,
+            String status,
+            String priority,
+            String title,
+            String body,
+            String actionUrl,
+            Map<String, Object> payload,
+            String source,
+            String dedupeKey,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant completedAt,
+            Instant dismissedAt
+    ) {}
 }
