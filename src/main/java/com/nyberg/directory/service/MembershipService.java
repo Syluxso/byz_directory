@@ -1,8 +1,10 @@
 package com.nyberg.directory.service;
 
+import com.nyberg.directory.client.IamRoleClient;
 import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
 import com.nyberg.directory.repository.MembershipRepository;
+import com.nyberg.directory.security.AuthSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,8 @@ public class MembershipService {
     private final MembershipRepository memberships;
     private final TenantService tenants;
     private final OrgRoleService orgRoles;
+    private final AuthSupport auth;
+    private final IamRoleClient iamRoles;
 
     @Transactional(readOnly = true)
     public List<MembershipResponse> listMembers(UUID organizationId, UUID tenantId) {
@@ -46,6 +50,7 @@ public class MembershipService {
                 .organizationId(organizationId)
                 .role(role)
                 .build());
+        iamRoles.syncTenantRole(organizationId, tenantId, req.userId(), role);
         return toResponse(m);
     }
 
@@ -56,7 +61,9 @@ public class MembershipService {
         Membership m = memberships.findByTenantIdAndUserId(tenantId, targetUserId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
         m.setRole(normalizeRole(req.role()));
-        return toResponse(memberships.save(m));
+        Membership saved = memberships.save(m);
+        iamRoles.syncTenantRole(organizationId, tenantId, targetUserId, saved.getRole());
+        return toResponse(saved);
     }
 
     @Transactional
@@ -67,9 +74,13 @@ public class MembershipService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found");
         }
         memberships.deleteByTenantIdAndUserId(tenantId, targetUserId);
+        iamRoles.revokeTenantRoles(organizationId, tenantId, targetUserId);
     }
 
     public void requireTenantAdmin(UUID tenantId, UUID userId) {
+        if (auth.isTenantAdminFromJwt(tenantId)) {
+            return;
+        }
         Membership m = memberships.findByTenantIdAndUserId(tenantId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a tenant member"));
         if (!"admin".equals(m.getRole())) {
@@ -86,6 +97,9 @@ public class MembershipService {
     }
 
     public boolean isTenantAdmin(UUID tenantId, UUID userId) {
+        if (auth.isTenantAdminFromJwt(tenantId)) {
+            return true;
+        }
         return memberships.findByTenantIdAndUserId(tenantId, userId)
                 .map(m -> "admin".equals(m.getRole()))
                 .orElse(false);

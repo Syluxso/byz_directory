@@ -60,7 +60,11 @@ public class ProfileService {
     @Transactional
     public ProfileResponse ensureProfile(UUID userId, UUID organizationId, EnsureProfileRequest req) {
         return profiles.findByUserIdAndOrganizationId(userId, organizationId)
-                .map(existing -> toProfileResponse(orgRoles.promoteToAdminIfNoAdminExists(existing)))
+                .map(existing -> {
+                    Profile p = orgRoles.promoteToAdminIfNoAdminExists(existing);
+                    orgRoles.syncOrgRoleToIam(organizationId, userId, p.getOrgRole());
+                    return toProfileResponse(p);
+                })
                 .orElseGet(() -> {
                     String email = normalizeEmail(req.email());
                     if (profiles.existsByOrganizationIdAndEmailIgnoreCase(organizationId, email)) {
@@ -79,6 +83,7 @@ public class ProfileService {
                             .orgRole(orgRoles.resolveRoleForNewProfile(organizationId))
                             .metadata(req.metadata())
                             .build());
+                    orgRoles.syncOrgRoleToIam(organizationId, userId, created.getOrgRole());
                     return toProfileResponse(created);
                 });
     }

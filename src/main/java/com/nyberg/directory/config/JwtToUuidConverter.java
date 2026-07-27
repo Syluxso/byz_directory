@@ -6,8 +6,11 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,12 +40,24 @@ public class JwtToUuidConverter implements Converter<Jwt, AbstractAuthentication
             } catch (IllegalArgumentException ignored) {}
         }
 
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        Object rawRoles = jwt.getClaim("roles");
+        if (rawRoles instanceof Collection<?> roles) {
+            for (Object role : roles) {
+                if (role == null) continue;
+                String value = role.toString().trim();
+                if (value.isEmpty()) continue;
+                authorities.add(new SimpleGrantedAuthority(value));
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + value.replace(':', '_')));
+            }
+        }
+
         // Keep Jwt as credentials; disable erase so AuthSupport.jwtOrNull() still works.
         UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(userId, jwt, List.of()) {
+                new UsernamePasswordAuthenticationToken(userId, jwt, authorities) {
                     @Override
                     public void eraseCredentials() {
-                        // no-op: retain Jwt for claim access (tenant_id, grant_type)
+                        // no-op: retain Jwt for claim access (tenant_id, grant_type, roles)
                     }
                 };
         return auth;

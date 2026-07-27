@@ -9,6 +9,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Component
@@ -78,5 +82,42 @@ public class AuthSupport {
             return jwt;
         }
         return null;
+    }
+
+    /** Roles claim from IAM JWT (e.g. org:admin, tenant:user, tenant:admin:&lt;uuid&gt;). */
+    public List<String> roles() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) return List.of();
+        Object raw = jwt.getClaim("roles");
+        if (!(raw instanceof Collection<?> col)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (Object item : col) {
+            if (item != null) {
+                String s = item.toString().trim().toLowerCase(Locale.ROOT);
+                if (!s.isEmpty()) out.add(s);
+            }
+        }
+        return out;
+    }
+
+    public boolean hasRole(String claim) {
+        if (claim == null || claim.isBlank()) return false;
+        String want = claim.trim().toLowerCase(Locale.ROOT);
+        return roles().contains(want);
+    }
+
+    public boolean isOrgAdminFromJwt() {
+        return hasRole("org:admin");
+    }
+
+    public boolean isTenantAdminFromJwt(UUID tenantId) {
+        if (isOrgAdminFromJwt()) return true;
+        if (hasRole("tenant:admin") && tenantId != null) {
+            UUID tokenTenant = TenantContext.get();
+            if (tokenTenant != null && tokenTenant.equals(tenantId)) {
+                return true;
+            }
+        }
+        return tenantId != null && hasRole("tenant:admin:" + tenantId);
     }
 }

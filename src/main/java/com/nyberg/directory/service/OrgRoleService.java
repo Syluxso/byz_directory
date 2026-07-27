@@ -1,7 +1,9 @@
 package com.nyberg.directory.service;
 
+import com.nyberg.directory.client.IamRoleClient;
 import com.nyberg.directory.domain.Profile;
 import com.nyberg.directory.repository.ProfileRepository;
+import com.nyberg.directory.security.AuthSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import java.util.UUID;
 public class OrgRoleService {
 
     private final ProfileRepository profiles;
+    private final AuthSupport auth;
+    private final IamRoleClient iamRoles;
 
     public Profile requireProfile(UUID userId, UUID organizationId) {
         return profiles.findByUserIdAndOrganizationId(userId, organizationId)
@@ -22,6 +26,10 @@ public class OrgRoleService {
     }
 
     public void requireOrgAdmin(UUID userId, UUID organizationId) {
+        if (auth.isOrgAdminFromJwt()) {
+            return;
+        }
+        // Migration fallback: Directory profile column until all tokens carry roles.
         Profile profile = requireProfile(userId, organizationId);
         if (!"admin".equalsIgnoreCase(profile.getOrgRole())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Organization admin required");
@@ -29,6 +37,9 @@ public class OrgRoleService {
     }
 
     public boolean isOrgAdmin(UUID userId, UUID organizationId) {
+        if (auth.isOrgAdminFromJwt()) {
+            return true;
+        }
         return profiles.findByUserIdAndOrganizationId(userId, organizationId)
                 .map(p -> "admin".equalsIgnoreCase(p.getOrgRole()))
                 .orElse(false);
@@ -46,8 +57,14 @@ public class OrgRoleService {
         if (!"admin".equalsIgnoreCase(profile.getOrgRole())
                 && !profiles.existsByOrganizationIdAndOrgRole(profile.getOrganizationId(), "admin")) {
             profile.setOrgRole("admin");
-            return profiles.save(profile);
+            Profile saved = profiles.save(profile);
+            iamRoles.syncOrgRole(saved.getOrganizationId(), saved.getUserId(), saved.getOrgRole());
+            return saved;
         }
         return profile;
+    }
+
+    public void syncOrgRoleToIam(UUID organizationId, UUID userId, String orgRole) {
+        iamRoles.syncOrgRole(organizationId, userId, orgRole);
     }
 }

@@ -1,5 +1,6 @@
 package com.nyberg.directory.service;
 
+import com.nyberg.directory.client.IamRoleClient;
 import com.nyberg.directory.domain.Invite;
 import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
@@ -31,6 +32,7 @@ public class InviteService {
     private final ProfileRepository profiles;
     private final TenantService tenants;
     private final MembershipService membershipService;
+    private final IamRoleClient iamRoles;
 
     @Transactional
     public InviteResponse create(UUID organizationId, UUID tenantId, UUID invitedBy, CreateInviteRequest req) {
@@ -83,6 +85,7 @@ public class InviteService {
                     .organizationId(organizationId)
                     .role(invite.getRole())
                     .build());
+            iamRoles.syncTenantRole(organizationId, invite.getTenantId(), userId, invite.getRole());
         }
 
         invite.setStatus("accepted");
@@ -147,6 +150,7 @@ public class InviteService {
                             .organizationId(organizationId)
                             .role(invite.getRole())
                             .build());
+                    iamRoles.syncTenantRole(organizationId, invite.getTenantId(), userId, invite.getRole());
                 }
                 invite.setStatus("accepted");
                 invite.setRespondedAt(Instant.now());

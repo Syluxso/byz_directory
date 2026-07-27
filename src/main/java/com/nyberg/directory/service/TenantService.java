@@ -1,5 +1,6 @@
 package com.nyberg.directory.service;
 
+import com.nyberg.directory.client.IamRoleClient;
 import com.nyberg.directory.domain.DirTenant;
 import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
@@ -23,6 +24,7 @@ public class TenantService {
 
     private final DirTenantRepository tenants;
     private final MembershipRepository memberships;
+    private final IamRoleClient iamRoles;
 
     @Transactional(readOnly = true)
     public List<TenantResponse> list(UUID organizationId) {
@@ -56,6 +58,7 @@ public class TenantService {
                     .organizationId(organizationId)
                     .role("admin")
                     .build());
+            iamRoles.syncTenantRole(organizationId, tenant.getId(), createdBy, "admin");
         }
         return toResponse(tenant);
     }
@@ -85,12 +88,14 @@ public class TenantService {
         }
         if (callerUserId != null && !memberships.existsByTenantIdAndUserId(tenant.getId(), callerUserId)) {
             boolean firstMember = memberships.findByTenantId(tenant.getId()).isEmpty();
+            String role = firstMember ? "admin" : "user";
             memberships.save(Membership.builder()
                     .tenantId(tenant.getId())
                     .userId(callerUserId)
                     .organizationId(organizationId)
-                    .role(firstMember ? "admin" : "user")
+                    .role(role)
                     .build());
+            iamRoles.syncTenantRole(organizationId, tenant.getId(), callerUserId, role);
         }
         return toResponse(tenant);
     }

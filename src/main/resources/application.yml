@@ -37,3 +37,8 @@ management:
 logging:
   pattern:
     console: '{"time":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","service":"byz-directory","logger":"%logger{36}","msg":"%msg"}%n'
+
+byz:
+  iam:
+    base-url: ${IAM_URL:https://iam.byzantineapp.dev}
+    role-sync-enabled: ${IAM_ROLE_SYNC_ENABLED:true}
