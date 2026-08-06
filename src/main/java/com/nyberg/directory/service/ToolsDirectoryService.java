@@ -34,7 +34,8 @@ public class ToolsDirectoryService {
 
     /**
      * Public directory view for the given user in the given org.
-     * No internal IDs exposed.
+     * No internal IDs exposed. Missing person profile is not an error — org and
+     * tenant memberships still resolve from session ids.
      */
     @Transactional(readOnly = true)
     public ToolsWhoamiResponse whoami(UUID userId, UUID organizationId) {
@@ -42,19 +43,22 @@ public class ToolsDirectoryService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "user and organization required");
         }
 
-        Profile profile = profiles.findByUserIdAndOrganizationId(userId, organizationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found for caller"));
+        Profile profile = profiles.findByUserIdAndOrganizationId(userId, organizationId).orElse(null);
+        boolean profileFound = profile != null;
+
+        PublicPerson person = null;
+        if (profile != null) {
+            person = new PublicPerson(
+                    blankToNull(profile.getDisplayName()),
+                    blankToNull(profile.getEmail()),
+                    profile.getOrgRole() != null ? profile.getOrgRole() : "member",
+                    toPublicContact(profile.getContactCardId()),
+                    toPublicAddress(profile.getAddressCardId())
+            );
+        }
 
         OrganizationProfile org = orgProfiles.findById(organizationId)
                 .orElseGet(() -> OrganizationProfile.builder().organizationId(organizationId).build());
-
-        PublicPerson person = new PublicPerson(
-                blankToNull(profile.getDisplayName()),
-                blankToNull(profile.getEmail()),
-                profile.getOrgRole() != null ? profile.getOrgRole() : "member",
-                toPublicContact(profile.getContactCardId()),
-                toPublicAddress(profile.getAddressCardId())
-        );
 
         PublicOrganization organization = new PublicOrganization(
                 blankToNull(org.getDisplayName()),
@@ -77,7 +81,7 @@ public class ToolsDirectoryService {
             ));
         }
 
-        return new ToolsWhoamiResponse(person, organization, tenantList);
+        return new ToolsWhoamiResponse(profileFound, person, organization, tenantList);
     }
 
     private PublicContact toPublicContact(UUID cardId) {

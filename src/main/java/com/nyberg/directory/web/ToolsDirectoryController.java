@@ -42,6 +42,8 @@ public class ToolsDirectoryController {
 
     /**
      * Public profile of the current chat user + their org + tenant memberships (names only).
+     * Always 200 when session resolves: missing person profile sets {@code profileFound=false}
+     * and still returns organization / tenants when present.
      */
     @GetMapping("/me")
     public ToolsWhoamiResponse me(

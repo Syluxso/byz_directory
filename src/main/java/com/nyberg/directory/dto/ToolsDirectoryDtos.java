@@ -50,8 +50,13 @@ public final class ToolsDirectoryDtos {
     /**
      * Caller context for Pax / agent tools.
      * Scope is always the chat user + org (resolved server-side).
+     *
+     * <p>{@code profileFound} is false when no directory person row exists yet;
+     * {@code person} is null in that case. Organization and tenants are still returned
+     * when available (session ids are enough).
      */
     public record ToolsWhoamiResponse(
+            boolean profileFound,
             PublicPerson person,
             PublicOrganization organization,
             List<PublicTenantMembership> tenants
