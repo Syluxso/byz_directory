@@ -42,3 +42,7 @@ byz:
   iam:
     base-url: ${IAM_URL:https://iam.byzantineapp.dev}
     role-sync-enabled: ${IAM_ROLE_SYNC_ENABLED:true}
+  tools:
+    # When set, only JWTs for this org (e.g. Byz platform / byz-agent) may pass userId+organizationId overrides.
+    # Empty = allow overrides (local/dev), same idea as byz-search.
+    admin-organization-id: ${BYZ_ADMIN_ORGANIZATION_ID:}

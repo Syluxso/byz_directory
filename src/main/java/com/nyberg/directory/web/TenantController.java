@@ -42,7 +42,6 @@ public class TenantController {
     public TenantResponse create(@PathVariable UUID orgId, @Valid @RequestBody CreateTenantRequest req) {
         auth.requireOrganizationId(orgId);
         UUID userId = auth.requireUserId();
-        orgRoles.requireOrgAdmin(userId, orgId);
         return tenants.create(orgId, userId, req);
     }
 
