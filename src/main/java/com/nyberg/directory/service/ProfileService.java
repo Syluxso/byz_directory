@@ -142,9 +142,10 @@ public class ProfileService {
 
     /**
      * Idempotent profile hydration from IAM lifecycle events ({@code user.registered},
-     * {@code user.authenticated}). Creates a profile if missing; only fills empty
-     * displayName / email — never overwrites user-edited fields. Phone is not set here
-     * (providers rarely send it without Graph).
+     * {@code user.authenticated}). Creates a profile if missing; fills empty displayName /
+     * email, or upgrades an email-local-part placeholder (e.g. {@code syluxso} from
+     * {@code syluxso@gmail.com}) when the IdP sends a real name. Never overwrites a
+     * non-placeholder display name. Phone is not set here.
      */
     @Transactional
     public void applyIdentityHint(UUID userId, UUID organizationId, String email, String displayName) {
@@ -156,7 +157,7 @@ public class ProfileService {
 
         profiles.findByUserIdAndOrganizationId(userId, organizationId).ifPresentOrElse(existing -> {
             boolean changed = false;
-            if (blankToNull(existing.getDisplayName()) == null && display != null) {
+            if (display != null && shouldReplaceDisplayName(existing.getDisplayName(), existing.getEmail(), mail)) {
                 existing.setDisplayName(display);
                 changed = true;
             }
@@ -190,6 +191,25 @@ public class ProfileService {
                     .build());
             orgRoles.syncOrgRoleToIam(organizationId, userId, created.getOrgRole());
         });
+    }
+
+    /**
+     * Replace when blank, or when current name is just the email local-part default
+     * produced by ensure/register (not a user-chosen full name).
+     */
+    static boolean shouldReplaceDisplayName(String currentDisplay, String profileEmail, String hintEmail) {
+        String current = blankToNull(currentDisplay);
+        if (current == null) {
+            return true;
+        }
+        String mail = profileEmail != null && !profileEmail.isBlank()
+                ? normalizeEmail(profileEmail)
+                : (hintEmail != null ? normalizeEmail(hintEmail) : null);
+        if (mail == null || !mail.contains("@")) {
+            return false;
+        }
+        String local = mail.substring(0, mail.indexOf('@'));
+        return current.equalsIgnoreCase(local);
     }
 
     private OrgProfileResponse toOrgResponse(OrganizationProfile p) {
