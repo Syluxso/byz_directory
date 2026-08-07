@@ -6,6 +6,7 @@ Org/user profiles, tenants (groups), membership, invites, and guided tasks. Orgs
 - DB: `docker compose up -d byz-directory-db` from `projects/db`
 - Deployed: `https://directory.byzantineapp.dev`
 - Auth: IAM JWT via JWKS (`organization_id` claim required for most routes)
+- Kafka: consumes **`byz.iam.user`** (`user.registered`, `user.authenticated`) to ensure/fill profiles (name/email gaps only). Toggle `BYZ_KAFKA_ENABLED`.
 
 ## Guided tasks
 

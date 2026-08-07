@@ -21,6 +21,15 @@ spring:
       resourceserver:
         jwt:
           jwk-set-uri: ${IAM_JWKS_URL:https://iam.byzantineapp.dev/.well-known/jwks.json}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:directory}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    admin:
+      fail-fast: false
 
 server:
   port: ${PORT:8086}
@@ -39,6 +48,10 @@ logging:
     console: '{"time":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","service":"byz-directory","logger":"%logger{36}","msg":"%msg"}%n'
 
 byz:
+  kafka:
+    enabled: ${BYZ_KAFKA_ENABLED:true}
+    topics:
+      iam-user: byz.iam.user
   iam:
     base-url: ${IAM_URL:https://iam.byzantineapp.dev}
     role-sync-enabled: ${IAM_ROLE_SYNC_ENABLED:true}

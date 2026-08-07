@@ -8,6 +8,12 @@ spring:
       resourceserver:
         jwt:
           jwk-set-uri: http://localhost:8082/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
 
 server:
   port: 8086
+
+byz:
+  kafka:
+    enabled: true

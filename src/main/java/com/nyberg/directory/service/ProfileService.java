@@ -140,6 +140,58 @@ public class ProfileService {
         return toProfileResponse(profiles.save(profile));
     }
 
+    /**
+     * Idempotent profile hydration from IAM lifecycle events ({@code user.registered},
+     * {@code user.authenticated}). Creates a profile if missing; only fills empty
+     * displayName / email — never overwrites user-edited fields. Phone is not set here
+     * (providers rarely send it without Graph).
+     */
+    @Transactional
+    public void applyIdentityHint(UUID userId, UUID organizationId, String email, String displayName) {
+        if (userId == null || organizationId == null) {
+            return;
+        }
+        String mail = email == null || email.isBlank() ? null : normalizeEmail(email);
+        String display = blankToNull(displayName);
+
+        profiles.findByUserIdAndOrganizationId(userId, organizationId).ifPresentOrElse(existing -> {
+            boolean changed = false;
+            if (blankToNull(existing.getDisplayName()) == null && display != null) {
+                existing.setDisplayName(display);
+                changed = true;
+            }
+            if ((existing.getEmail() == null || existing.getEmail().isBlank()) && mail != null) {
+                if (!profiles.existsByOrganizationIdAndEmailIgnoreCase(organizationId, mail)
+                        || mail.equalsIgnoreCase(existing.getEmail())) {
+                    existing.setEmail(mail);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                profiles.save(existing);
+            }
+        }, () -> {
+            if (mail == null) {
+                return;
+            }
+            if (profiles.existsByOrganizationIdAndEmailIgnoreCase(organizationId, mail)) {
+                // Another userId already owns this email in the org — skip create.
+                return;
+            }
+            String name = display != null
+                    ? display
+                    : (mail.contains("@") ? mail.substring(0, mail.indexOf('@')) : mail);
+            Profile created = profiles.save(Profile.builder()
+                    .userId(userId)
+                    .organizationId(organizationId)
+                    .email(mail)
+                    .displayName(name)
+                    .orgRole(orgRoles.resolveRoleForNewProfile(organizationId))
+                    .build());
+            orgRoles.syncOrgRoleToIam(organizationId, userId, created.getOrgRole());
+        });
+    }
+
     private OrgProfileResponse toOrgResponse(OrganizationProfile p) {
         return new OrgProfileResponse(
                 p.getOrganizationId(),
