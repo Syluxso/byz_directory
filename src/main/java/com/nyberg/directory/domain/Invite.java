@@ -59,6 +59,7 @@ public class Invite {
         updatedAt = now;
         if (role == null) role = "user";
         if (status == null) status = "pending";
+        // Product rule: invites do not expire.
     }
 
     @PreUpdate

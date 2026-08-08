@@ -15,6 +15,13 @@ import java.util.UUID;
 @Builder
 public class Membership {
 
+    public static final String STATUS_ACTIVE = "active";
+    public static final String STATUS_BLOCKED = "blocked";
+    public static final String STATUS_REMOVED = "removed";
+
+    public static final String ROLE_ADMIN = "admin";
+    public static final String ROLE_USER = "user";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -31,6 +38,13 @@ public class Membership {
     @Column(nullable = false)
     private String role;
 
+    /** active | blocked | removed */
+    @Column(nullable = false)
+    private String status;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -42,11 +56,28 @@ public class Membership {
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
-        if (role == null) role = "user";
+        if (role == null) role = ROLE_USER;
+        if (status == null) status = STATUS_ACTIVE;
     }
 
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    public boolean isActive() {
+        return STATUS_ACTIVE.equals(status);
+    }
+
+    public boolean isBlocked() {
+        return STATUS_BLOCKED.equals(status);
+    }
+
+    public boolean isRemoved() {
+        return STATUS_REMOVED.equals(status);
+    }
+
+    public boolean isAdmin() {
+        return ROLE_ADMIN.equals(role);
     }
 }

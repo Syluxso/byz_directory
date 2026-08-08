@@ -48,6 +48,15 @@ public class InviteController {
         return invites.revoke(orgId, tenantId, inviteId, auth.requireUserId());
     }
 
+    @PostMapping("/tenants/{tenantId}/invites/{inviteId}/resend")
+    public InviteResponse resend(
+            @PathVariable UUID orgId,
+            @PathVariable UUID tenantId,
+            @PathVariable UUID inviteId) {
+        auth.requireOrganizationId(orgId);
+        return invites.resend(orgId, tenantId, inviteId, auth.requireUserId());
+    }
+
     @GetMapping("/invites/pending")
     public List<InviteResponse> myPending(
             @PathVariable UUID orgId,

@@ -56,14 +56,24 @@ public class TenantService {
                 .createdBy(createdBy)
                 .build());
         // Creator becomes tenant admin so they can invite / manage the team immediately.
-        if (createdBy != null && !memberships.existsByTenantIdAndUserId(tenant.getId(), createdBy)) {
-            memberships.save(Membership.builder()
-                    .tenantId(tenant.getId())
-                    .userId(createdBy)
-                    .organizationId(organizationId)
-                    .role("admin")
-                    .build());
-            iamRoles.syncTenantRole(organizationId, tenant.getId(), createdBy, "admin");
+        Membership creatorMembership = null;
+        if (createdBy != null) {
+            creatorMembership = memberships.findByTenantIdAndUserId(tenant.getId(), createdBy).orElse(null);
+            if (creatorMembership == null) {
+                creatorMembership = memberships.save(Membership.builder()
+                        .tenantId(tenant.getId())
+                        .userId(createdBy)
+                        .organizationId(organizationId)
+                        .role(Membership.ROLE_ADMIN)
+                        .status(Membership.STATUS_ACTIVE)
+                        .build());
+            } else if (!creatorMembership.isActive()) {
+                creatorMembership.setRole(Membership.ROLE_ADMIN);
+                creatorMembership.setStatus(Membership.STATUS_ACTIVE);
+                creatorMembership.setDeletedAt(null);
+                creatorMembership = memberships.save(creatorMembership);
+            }
+            iamRoles.syncTenantRole(organizationId, tenant.getId(), createdBy, Membership.ROLE_ADMIN);
         }
         events.publishEvent(new TenantCreatedApplicationEvent(
                 this,
@@ -75,7 +85,7 @@ public class TenantService {
                         tenant.getSlug()
                 )
         ));
-        if (createdBy != null) {
+        if (createdBy != null && creatorMembership != null) {
             events.publishEvent(new TenantMemberJoinedApplicationEvent(
                     this,
                     TenantLifecycleEvent.memberJoined(
@@ -84,6 +94,26 @@ public class TenantService {
                             createdBy,
                             tenant.getName(),
                             tenant.getSlug()
+                    )
+            ));
+            events.publishEvent(new com.nyberg.directory.messaging.MembershipLifecycleApplicationEvent(
+                    this,
+                    com.nyberg.directory.messaging.MembershipLifecycleEvent.of(
+                            com.nyberg.directory.messaging.MembershipLifecycleEvent.TYPE_MEMBERSHIP_JOINED,
+                            organizationId,
+                            tenant.getId(),
+                            tenant.getName(),
+                            tenant.getSlug(),
+                            createdBy,
+                            null,
+                            null,
+                            createdBy,
+                            null,
+                            null,
+                            Membership.ROLE_ADMIN,
+                            null,
+                            Membership.STATUS_ACTIVE,
+                            null
                     )
             ));
         }
@@ -114,17 +144,29 @@ public class TenantService {
                     .build());
         }
         boolean newlyJoined = false;
-        if (callerUserId != null && !memberships.existsByTenantIdAndUserId(tenant.getId(), callerUserId)) {
-            boolean firstMember = memberships.findByTenantId(tenant.getId()).isEmpty();
-            String role = firstMember ? "admin" : "user";
-            memberships.save(Membership.builder()
-                    .tenantId(tenant.getId())
-                    .userId(callerUserId)
-                    .organizationId(organizationId)
-                    .role(role)
-                    .build());
-            iamRoles.syncTenantRole(organizationId, tenant.getId(), callerUserId, role);
-            newlyJoined = true;
+        if (callerUserId != null) {
+            Membership existingMem = memberships.findByTenantIdAndUserId(tenant.getId(), callerUserId).orElse(null);
+            if (existingMem == null || !existingMem.isActive()) {
+                boolean firstMember = memberships.findByTenantIdAndStatusIn(
+                        tenant.getId(), List.of(Membership.STATUS_ACTIVE)).isEmpty();
+                String role = firstMember ? Membership.ROLE_ADMIN : Membership.ROLE_USER;
+                if (existingMem == null) {
+                    memberships.save(Membership.builder()
+                            .tenantId(tenant.getId())
+                            .userId(callerUserId)
+                            .organizationId(organizationId)
+                            .role(role)
+                            .status(Membership.STATUS_ACTIVE)
+                            .build());
+                } else {
+                    existingMem.setRole(role);
+                    existingMem.setStatus(Membership.STATUS_ACTIVE);
+                    existingMem.setDeletedAt(null);
+                    memberships.save(existingMem);
+                }
+                iamRoles.syncTenantRole(organizationId, tenant.getId(), callerUserId, role);
+                newlyJoined = true;
+            }
         }
         if (existing.isEmpty()) {
             events.publishEvent(new TenantCreatedApplicationEvent(

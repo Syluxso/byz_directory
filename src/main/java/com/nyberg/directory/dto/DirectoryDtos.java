@@ -145,7 +145,13 @@ public final class DirectoryDtos {
             UUID userId,
             UUID organizationId,
             String role,
-            Instant createdAt
+            /** active | blocked | removed */
+            String status,
+            Instant createdAt,
+            Instant deletedAt,
+            /** Optional profile enrichment for UI. */
+            String displayName,
+            String email
     ) {}
 
     public record CreateInviteRequest(
@@ -164,7 +170,9 @@ public final class DirectoryDtos {
             UUID invitedBy,
             Instant expiresAt,
             Instant respondedAt,
-            Instant createdAt
+            Instant createdAt,
+            /** Optional workspace name for inbound invite lists. */
+            String tenantName
     ) {}
 
     public record ClaimInvitesRequest(

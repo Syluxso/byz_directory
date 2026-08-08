@@ -35,7 +35,15 @@ public class AuthSupport {
     }
 
     public UUID requireOrganizationId(UUID pathOrgId) {
-        UUID tokenOrg = requireOrganizationId();
+        UUID tokenOrg = OrganizationContext.get();
+        if (tokenOrg == null) {
+            // Service tokens often omit organization_id; trust path org when service JWT.
+            if (isServiceToken()) {
+                OrganizationContext.set(pathOrgId);
+                return pathOrgId;
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "organization_id missing from token/context");
+        }
         if (!tokenOrg.equals(pathOrgId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Organization mismatch");
         }

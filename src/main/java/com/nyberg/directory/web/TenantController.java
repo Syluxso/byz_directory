@@ -67,7 +67,12 @@ public class TenantController {
             @PathVariable UUID tenantId,
             @RequestBody UpdateTenantRequest req) {
         auth.requireOrganizationId(orgId);
-        orgRoles.requireOrgAdmin(auth.requireUserId(), orgId);
+        UUID actor = auth.requireUserId();
+        // Workspace admins (or org admins) may edit workspace profile.
+        if (!memberships.canManageTenant(orgId, tenantId, actor)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Workspace admin required");
+        }
         return tenants.update(orgId, tenantId, req);
     }
 
@@ -82,7 +87,10 @@ public class TenantController {
     @GetMapping("/{tenantId}/members")
     public List<MembershipResponse> listMembers(@PathVariable UUID orgId, @PathVariable UUID tenantId) {
         auth.requireOrganizationId(orgId);
-        auth.requireUserId();
+        // Service tokens (managed-api) may list members for notification fan-out.
+        if (!auth.isServiceToken()) {
+            auth.requireUserId();
+        }
         return memberships.listMembers(orgId, tenantId);
     }
 
@@ -117,5 +125,33 @@ public class TenantController {
         auth.requireOrganizationId(orgId);
         UUID actor = auth.requireUserId();
         memberships.removeMember(orgId, tenantId, userId, actor);
+    }
+
+    @PostMapping("/{tenantId}/members/{userId}/block")
+    public MembershipResponse blockMember(
+            @PathVariable UUID orgId,
+            @PathVariable UUID tenantId,
+            @PathVariable UUID userId) {
+        auth.requireOrganizationId(orgId);
+        UUID actor = auth.requireUserId();
+        return memberships.block(orgId, tenantId, userId, actor);
+    }
+
+    @PostMapping("/{tenantId}/members/{userId}/unblock")
+    public MembershipResponse unblockMember(
+            @PathVariable UUID orgId,
+            @PathVariable UUID tenantId,
+            @PathVariable UUID userId) {
+        auth.requireOrganizationId(orgId);
+        UUID actor = auth.requireUserId();
+        return memberships.unblock(orgId, tenantId, userId, actor);
+    }
+
+    /** Self-service leave. Last active admin cannot leave. */
+    @PostMapping("/{tenantId}/leave")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void leave(@PathVariable UUID orgId, @PathVariable UUID tenantId) {
+        auth.requireOrganizationId(orgId);
+        memberships.leave(orgId, tenantId, auth.requireUserId());
     }
 }

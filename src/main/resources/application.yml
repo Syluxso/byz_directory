@@ -56,6 +56,7 @@ byz:
     topics:
       iam-user: byz.iam.user
       directory-tenant: byz.directory.tenant
+      directory-membership: byz.directory.membership
   iam:
     base-url: ${IAM_URL:https://iam.byzantineapp.dev}
     role-sync-enabled: ${IAM_ROLE_SYNC_ENABLED:true}
