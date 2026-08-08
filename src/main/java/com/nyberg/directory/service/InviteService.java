@@ -1,13 +1,17 @@
 package com.nyberg.directory.service;
 
 import com.nyberg.directory.client.IamRoleClient;
+import com.nyberg.directory.domain.DirTenant;
 import com.nyberg.directory.domain.Invite;
 import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
+import com.nyberg.directory.messaging.TenantLifecycleEvent;
+import com.nyberg.directory.messaging.TenantMemberJoinedApplicationEvent;
 import com.nyberg.directory.repository.InviteRepository;
 import com.nyberg.directory.repository.MembershipRepository;
 import com.nyberg.directory.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +37,7 @@ public class InviteService {
     private final TenantService tenants;
     private final MembershipService membershipService;
     private final IamRoleClient iamRoles;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public InviteResponse create(UUID organizationId, UUID tenantId, UUID invitedBy, CreateInviteRequest req) {
@@ -86,6 +91,17 @@ public class InviteService {
                     .role(invite.getRole())
                     .build());
             iamRoles.syncTenantRole(organizationId, invite.getTenantId(), userId, invite.getRole());
+            DirTenant tenant = tenants.requireTenant(organizationId, invite.getTenantId());
+            events.publishEvent(new TenantMemberJoinedApplicationEvent(
+                    this,
+                    TenantLifecycleEvent.memberJoined(
+                            organizationId,
+                            invite.getTenantId(),
+                            userId,
+                            tenant.getName(),
+                            tenant.getSlug()
+                    )
+            ));
         }
 
         invite.setStatus("accepted");
@@ -151,6 +167,17 @@ public class InviteService {
                             .role(invite.getRole())
                             .build());
                     iamRoles.syncTenantRole(organizationId, invite.getTenantId(), userId, invite.getRole());
+                    DirTenant tenant = tenants.requireTenant(organizationId, invite.getTenantId());
+                    events.publishEvent(new TenantMemberJoinedApplicationEvent(
+                            this,
+                            TenantLifecycleEvent.memberJoined(
+                                    organizationId,
+                                    invite.getTenantId(),
+                                    userId,
+                                    tenant.getName(),
+                                    tenant.getSlug()
+                            )
+                    ));
                 }
                 invite.setStatus("accepted");
                 invite.setRespondedAt(Instant.now());

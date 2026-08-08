@@ -77,4 +77,23 @@ public class ProfileController {
         auth.requireOrganizationId(orgId);
         return memberships.listMyMemberships(auth.requireUserId(), orgId);
     }
+
+    /**
+     * List memberships for a subject. User JWT: self only. Service token: any user in org
+     * (used by byz-managed-api product rules).
+     */
+    @GetMapping("/orgs/{orgId}/users/{userId}/memberships")
+    public List<MembershipResponse> membershipsForUser(
+            @PathVariable UUID orgId,
+            @PathVariable UUID userId) {
+        auth.requireOrganizationId(orgId);
+        if (!auth.isServiceToken()) {
+            UUID actor = auth.requireUserId();
+            if (!actor.equals(userId)) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN, "Can only list your own memberships");
+            }
+        }
+        return memberships.listMyMemberships(userId, orgId);
+    }
 }

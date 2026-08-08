@@ -1,11 +1,15 @@
 package com.nyberg.directory.service;
 
 import com.nyberg.directory.client.IamRoleClient;
+import com.nyberg.directory.domain.DirTenant;
 import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
+import com.nyberg.directory.messaging.TenantLifecycleEvent;
+import com.nyberg.directory.messaging.TenantMemberJoinedApplicationEvent;
 import com.nyberg.directory.repository.MembershipRepository;
 import com.nyberg.directory.security.AuthSupport;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,7 @@ public class MembershipService {
     private final OrgRoleService orgRoles;
     private final AuthSupport auth;
     private final IamRoleClient iamRoles;
+    private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public List<MembershipResponse> listMembers(UUID organizationId, UUID tenantId) {
@@ -51,6 +56,17 @@ public class MembershipService {
                 .role(role)
                 .build());
         iamRoles.syncTenantRole(organizationId, tenantId, req.userId(), role);
+        DirTenant tenant = tenants.requireTenant(organizationId, tenantId);
+        events.publishEvent(new TenantMemberJoinedApplicationEvent(
+                this,
+                TenantLifecycleEvent.memberJoined(
+                        organizationId,
+                        tenantId,
+                        req.userId(),
+                        tenant.getName(),
+                        tenant.getSlug()
+                )
+        ));
         return toResponse(m);
     }
 

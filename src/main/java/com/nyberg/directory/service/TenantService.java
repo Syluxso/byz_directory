@@ -4,9 +4,13 @@ import com.nyberg.directory.client.IamRoleClient;
 import com.nyberg.directory.domain.DirTenant;
 import com.nyberg.directory.domain.Membership;
 import com.nyberg.directory.dto.DirectoryDtos.*;
+import com.nyberg.directory.messaging.TenantCreatedApplicationEvent;
+import com.nyberg.directory.messaging.TenantLifecycleEvent;
+import com.nyberg.directory.messaging.TenantMemberJoinedApplicationEvent;
 import com.nyberg.directory.repository.DirTenantRepository;
 import com.nyberg.directory.repository.MembershipRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +29,7 @@ public class TenantService {
     private final DirTenantRepository tenants;
     private final MembershipRepository memberships;
     private final IamRoleClient iamRoles;
+    private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public List<TenantResponse> list(UUID organizationId) {
@@ -60,6 +65,28 @@ public class TenantService {
                     .build());
             iamRoles.syncTenantRole(organizationId, tenant.getId(), createdBy, "admin");
         }
+        events.publishEvent(new TenantCreatedApplicationEvent(
+                this,
+                TenantLifecycleEvent.tenantCreated(
+                        organizationId,
+                        tenant.getId(),
+                        createdBy,
+                        tenant.getName(),
+                        tenant.getSlug()
+                )
+        ));
+        if (createdBy != null) {
+            events.publishEvent(new TenantMemberJoinedApplicationEvent(
+                    this,
+                    TenantLifecycleEvent.memberJoined(
+                            organizationId,
+                            tenant.getId(),
+                            createdBy,
+                            tenant.getName(),
+                            tenant.getSlug()
+                    )
+            ));
+        }
         return toResponse(tenant);
     }
 
@@ -86,6 +113,7 @@ public class TenantService {
                     .createdBy(callerUserId)
                     .build());
         }
+        boolean newlyJoined = false;
         if (callerUserId != null && !memberships.existsByTenantIdAndUserId(tenant.getId(), callerUserId)) {
             boolean firstMember = memberships.findByTenantId(tenant.getId()).isEmpty();
             String role = firstMember ? "admin" : "user";
@@ -96,6 +124,31 @@ public class TenantService {
                     .role(role)
                     .build());
             iamRoles.syncTenantRole(organizationId, tenant.getId(), callerUserId, role);
+            newlyJoined = true;
+        }
+        if (existing.isEmpty()) {
+            events.publishEvent(new TenantCreatedApplicationEvent(
+                    this,
+                    TenantLifecycleEvent.tenantCreated(
+                            organizationId,
+                            tenant.getId(),
+                            callerUserId,
+                            tenant.getName(),
+                            tenant.getSlug()
+                    )
+            ));
+        }
+        if (newlyJoined && callerUserId != null) {
+            events.publishEvent(new TenantMemberJoinedApplicationEvent(
+                    this,
+                    TenantLifecycleEvent.memberJoined(
+                            organizationId,
+                            tenant.getId(),
+                            callerUserId,
+                            tenant.getName(),
+                            tenant.getSlug()
+                    )
+            ));
         }
         return toResponse(tenant);
     }

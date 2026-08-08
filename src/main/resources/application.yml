@@ -28,6 +28,9 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
     admin:
       fail-fast: false
 
@@ -52,6 +55,7 @@ byz:
     enabled: ${BYZ_KAFKA_ENABLED:true}
     topics:
       iam-user: byz.iam.user
+      directory-tenant: byz.directory.tenant
   iam:
     base-url: ${IAM_URL:https://iam.byzantineapp.dev}
     role-sync-enabled: ${IAM_ROLE_SYNC_ENABLED:true}
