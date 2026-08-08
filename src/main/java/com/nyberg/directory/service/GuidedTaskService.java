@@ -64,6 +64,8 @@ public class GuidedTaskService {
                 .title(blankToNull(req.title()))
                 .body(blankToNull(req.body()))
                 .actionUrl(blankToNull(req.actionUrl()))
+                .displayRoute(normalizeDisplayRoute(req.displayRoute()))
+                .dismissal(normalizeDismissal(req.dismissal()))
                 .payload(req.payload())
                 .source(blankToNull(req.source()))
                 .dedupeKey(dedupe)
@@ -87,7 +89,7 @@ public class GuidedTaskService {
             UUID orgId, UUID taskId, UUID actorUserId, boolean serviceToken, String rawStatus) {
         GuidedTask task = repo.findByIdAndOrganizationId(taskId, orgId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found"));
-        requireCanMutate(task, actorUserId, serviceToken);
+        requireCanMutate(task, actorUserId, serviceToken, rawStatus);
 
         String status = normalizeStatus(rawStatus);
         task.setStatus(status);
@@ -95,13 +97,47 @@ public class GuidedTaskService {
         return toResponse(repo.save(task));
     }
 
-    private void requireCanMutate(GuidedTask task, UUID actorUserId, boolean serviceToken) {
+    private void requireCanMutate(
+            GuidedTask task, UUID actorUserId, boolean serviceToken, String rawStatus) {
         if (serviceToken) {
             return;
         }
         if (actorUserId == null || !actorUserId.equals(task.getSubjectUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to update this task");
         }
+        // Product UI users may only complete/dismiss when dismissal=user (default).
+        String dismissal = task.getDismissal() != null ? task.getDismissal().trim().toLowerCase(Locale.ROOT) : "user";
+        if ("system".equals(dismissal)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This task can only be closed by the system");
+        }
+    }
+
+    /** Null/blank = Home-only. Otherwise store a path prefix starting with /. */
+    static String normalizeDisplayRoute(String route) {
+        if (route == null || route.isBlank()) {
+            return null;
+        }
+        String r = route.trim();
+        if (!r.startsWith("/")) {
+            r = "/" + r;
+        }
+        if (r.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "displayRoute too long");
+        }
+        return r;
+    }
+
+    static String normalizeDismissal(String dismissal) {
+        if (dismissal == null || dismissal.isBlank()) {
+            return "user";
+        }
+        String d = dismissal.trim().toLowerCase(Locale.ROOT);
+        return switch (d) {
+            case "user", "system" -> d;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "dismissal must be user or system");
+        };
     }
 
     private void applyStatusTimestamps(GuidedTask task, String status, Instant now) {
@@ -136,6 +172,10 @@ public class GuidedTaskService {
     }
 
     private GuidedTaskResponse toResponse(GuidedTask t) {
+        String dismissal = t.getDismissal();
+        if (dismissal == null || dismissal.isBlank()) {
+            dismissal = "user";
+        }
         return new GuidedTaskResponse(
                 t.getId(),
                 t.getOrganizationId(),
@@ -147,6 +187,8 @@ public class GuidedTaskService {
                 t.getTitle(),
                 t.getBody(),
                 t.getActionUrl(),
+                t.getDisplayRoute(),
+                dismissal,
                 t.getPayload(),
                 t.getSource(),
                 t.getDedupeKey(),

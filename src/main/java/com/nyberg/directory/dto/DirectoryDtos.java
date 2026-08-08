@@ -187,6 +187,10 @@ public final class DirectoryDtos {
             String title,
             String body,
             String actionUrl,
+            /** Null/blank = Home only; otherwise path prefix where the task is shown. */
+            String displayRoute,
+            /** user (default) | system — who may dismiss/complete from the product UI. */
+            String dismissal,
             Map<String, Object> payload,
             String source,
             String dedupeKey,
@@ -208,6 +212,8 @@ public final class DirectoryDtos {
             String title,
             String body,
             String actionUrl,
+            String displayRoute,
+            String dismissal,
             Map<String, Object> payload,
             String source,
             String dedupeKey,

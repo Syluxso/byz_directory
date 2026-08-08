@@ -49,6 +49,20 @@ public class GuidedTask {
     @Column(name = "action_url", columnDefinition = "TEXT")
     private String actionUrl;
 
+    /**
+     * Where the task is shown in the product UI. Null/blank = Home (/app/me) only.
+     * When set, matched as a path prefix (e.g. /app/workspace).
+     */
+    @Column(name = "display_route", length = 255)
+    private String displayRoute;
+
+    /**
+     * Who may dismiss/complete from the product UI: {@code user} (default) or {@code system}.
+     */
+    @Column(nullable = false, length = 32)
+    @Builder.Default
+    private String dismissal = "user";
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> payload;
@@ -78,6 +92,7 @@ public class GuidedTask {
         if (updatedAt == null) updatedAt = now;
         if (status == null || status.isBlank()) status = "open";
         if (priority == null || priority.isBlank()) priority = "normal";
+        if (dismissal == null || dismissal.isBlank()) dismissal = "user";
     }
 
     @PreUpdate
