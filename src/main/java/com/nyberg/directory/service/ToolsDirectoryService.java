@@ -67,7 +67,8 @@ public class ToolsDirectoryService {
         );
 
         List<PublicTenantMembership> tenantList = new ArrayList<>();
-        for (Membership m : memberships.findByUserIdAndOrganizationId(userId, organizationId)) {
+        for (Membership m : memberships.findByUserIdAndOrganizationIdAndStatus(
+                userId, organizationId, Membership.STATUS_ACTIVE)) {
             DirTenant t = tenants.findByIdAndOrganizationIdAndDeletedAtIsNull(m.getTenantId(), organizationId)
                     .orElse(null);
             if (t == null) {
