@@ -21,6 +21,8 @@ public class DeviceIpIntel {
     public static final String STATUS_SUCCESS = "success";
     public static final String STATUS_ERROR = "error";
     public static final String SOURCE_MAXMIND_INSIGHTS = "maxmind_insights";
+    public static final String SOURCE_UNROUTABLE = "unroutable";
+    public static final String SOURCE_UNCONFIGURED = "unconfigured";
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

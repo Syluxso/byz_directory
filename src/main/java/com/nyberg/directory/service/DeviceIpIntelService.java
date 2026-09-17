@@ -47,9 +47,12 @@ public class DeviceIpIntelService {
         }
         String ip = PublicIps.normalizeOrNull(rawIp);
         if (ip == null) {
-            log.debug("Skipping intel for non-public IP deviceId={}", deviceId);
+            log.info("Skipping MaxMind for non-public IP deviceId={} rawIp={}", deviceId, rawIp);
+            persistSkip(organizationId, userId, deviceId, rawIp, DeviceIpIntel.SOURCE_UNROUTABLE);
             return;
         }
+
+        log.info("Observing IP intel org={} user={} deviceId={} ip={}", organizationId, userId, deviceId, ip);
 
         Optional<DeviceIpIntel> existing = repo.findByDeviceIdAndIp(deviceId, ip);
         if (existing.isPresent() && existing.get().isSuccess()) {
@@ -101,6 +104,7 @@ public class DeviceIpIntelService {
     ) {
         if (!maxMind.configured()) {
             log.warn("MaxMind Insights skipped (credentials not set) deviceId={} ip={}", deviceId, ip);
+            persistSkip(organizationId, userId, deviceId, ip, DeviceIpIntel.SOURCE_UNCONFIGURED);
             return;
         }
         String body;
@@ -136,6 +140,24 @@ public class DeviceIpIntelService {
         DeviceIpIntel row = existing != null ? existing : newRow(organizationId, userId, deviceId, ip);
         row.setStatus(DeviceIpIntel.STATUS_ERROR);
         row.setSource(DeviceIpIntel.SOURCE_MAXMIND_INSIGHTS);
+        row.setLookedUpAt(now);
+        row.setLastSeenAt(now);
+        repo.save(row);
+    }
+
+    private void persistSkip(UUID organizationId, UUID userId, UUID deviceId, String rawIp, String source) {
+        String storedIp = rawIp == null || rawIp.isBlank() ? "unknown" : rawIp.trim();
+        if (storedIp.length() > 64) {
+            storedIp = storedIp.substring(0, 64);
+        }
+        final String ipKey = storedIp;
+        Optional<DeviceIpIntel> existing = repo.findByDeviceIdAndIp(deviceId, ipKey);
+        Instant now = Instant.now();
+        DeviceIpIntel row = existing.orElseGet(() -> newRow(organizationId, userId, deviceId, ipKey));
+        row.setOrganizationId(organizationId);
+        row.setUserId(userId);
+        row.setStatus(DeviceIpIntel.STATUS_ERROR);
+        row.setSource(source);
         row.setLookedUpAt(now);
         row.setLastSeenAt(now);
         repo.save(row);
@@ -191,9 +213,13 @@ public class DeviceIpIntelService {
     }
 
     private void lockIp(String ip) {
-        entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(hashtextextended(:ip, 0))")
-                .setParameter("ip", ip)
-                .getSingleResult();
+        try {
+            entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(hashtextextended(?1, 0))")
+                    .setParameter(1, ip)
+                    .getSingleResult();
+        } catch (Exception e) {
+            log.warn("IP advisory lock failed ip={}: {}", ip, e.toString());
+        }
     }
 
     static DeviceIpIntelResponse toResponse(DeviceIpIntel r) {

@@ -37,7 +37,9 @@ public class IamUserEventListener {
             boolean profileType = IamUserLifecycleEvent.TYPE_USER_REGISTERED.equals(event.type())
                     || IamUserLifecycleEvent.TYPE_USER_AUTHENTICATED.equals(event.type());
             boolean intelType = IamUserLifecycleEvent.TYPE_DEVICE_REGISTERED.equals(event.type())
-                    || IamUserLifecycleEvent.TYPE_DEVICE_IP_OBSERVED.equals(event.type());
+                    || IamUserLifecycleEvent.TYPE_DEVICE_IP_OBSERVED.equals(event.type())
+                    || (IamUserLifecycleEvent.TYPE_USER_AUTHENTICATED.equals(event.type())
+                    && event.deviceId() != null);
             if (!profileType && !intelType) {
                 log.debug("Directory ignoring byz.iam.user type={}", event.type());
                 return;

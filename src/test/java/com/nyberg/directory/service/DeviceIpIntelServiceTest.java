@@ -50,9 +50,13 @@ class DeviceIpIntelServiceTest {
     }
 
     @Test
-    void skipsPrivateIp() {
+    void recordsUnroutableSkipForPrivateIp() {
+        when(repo.findByDeviceIdAndIp(device, "192.168.0.1")).thenReturn(Optional.empty());
         service.observe(org, user, device, "192.168.0.1");
-        verify(repo, never()).save(any());
+        ArgumentCaptor<DeviceIpIntel> cap = ArgumentCaptor.forClass(DeviceIpIntel.class);
+        verify(repo).save(cap.capture());
+        assertEquals(DeviceIpIntel.SOURCE_UNROUTABLE, cap.getValue().getSource());
+        assertEquals(DeviceIpIntel.STATUS_ERROR, cap.getValue().getStatus());
         verify(maxMind, never()).lookup(anyString());
     }
 
