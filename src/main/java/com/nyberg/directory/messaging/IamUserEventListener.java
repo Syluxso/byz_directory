@@ -1,6 +1,7 @@
 package com.nyberg.directory.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nyberg.directory.service.DeviceIpIntelService;
 import com.nyberg.directory.service.ProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +10,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Consumes {@code byz.iam.user} and hydrates directory profiles (ensure + fill empty fields).
+ * Consumes {@code byz.iam.user}: profile fill on register/auth, IP intel on
+ * {@code device.registered} / {@code device.ip_observed}.
  */
 @Slf4j
 @Component
@@ -19,6 +21,7 @@ public class IamUserEventListener {
 
     private final ObjectMapper objectMapper;
     private final ProfileService profiles;
+    private final DeviceIpIntelService deviceIpIntel;
 
     @KafkaListener(
             topics = "${byz.kafka.topics.iam-user:byz.iam.user}",
@@ -31,8 +34,11 @@ public class IamUserEventListener {
                 log.warn("Ignoring empty byz.iam.user payload");
                 return;
             }
-            if (!IamUserLifecycleEvent.TYPE_USER_REGISTERED.equals(event.type())
-                    && !IamUserLifecycleEvent.TYPE_USER_AUTHENTICATED.equals(event.type())) {
+            boolean profileType = IamUserLifecycleEvent.TYPE_USER_REGISTERED.equals(event.type())
+                    || IamUserLifecycleEvent.TYPE_USER_AUTHENTICATED.equals(event.type());
+            boolean intelType = IamUserLifecycleEvent.TYPE_DEVICE_REGISTERED.equals(event.type())
+                    || IamUserLifecycleEvent.TYPE_DEVICE_IP_OBSERVED.equals(event.type());
+            if (!profileType && !intelType) {
                 log.debug("Directory ignoring byz.iam.user type={}", event.type());
                 return;
             }
@@ -41,14 +47,24 @@ public class IamUserEventListener {
                         event.type(), event.eventId());
                 return;
             }
-            profiles.applyIdentityHint(
-                    event.userId(),
-                    event.organizationId(),
-                    event.email(),
-                    event.displayName()
-            );
-            log.info("Applied identity hint type={} provider={} userId={} orgId={}",
-                    event.type(), event.provider(), event.userId(), event.organizationId());
+            if (profileType) {
+                profiles.applyIdentityHint(
+                        event.userId(),
+                        event.organizationId(),
+                        event.email(),
+                        event.displayName()
+                );
+                log.info("Applied identity hint type={} provider={} userId={} orgId={}",
+                        event.type(), event.provider(), event.userId(), event.organizationId());
+            }
+            if (intelType) {
+                deviceIpIntel.observe(
+                        event.organizationId(),
+                        event.userId(),
+                        event.deviceId(),
+                        event.deviceIp()
+                );
+            }
         } catch (Exception e) {
             log.error("Failed to process byz.iam.user message: {}", e.toString());
             throw new IllegalStateException("Failed to process byz.iam.user message", e);

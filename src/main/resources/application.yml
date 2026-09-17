@@ -64,3 +64,8 @@ byz:
     # When set, only JWTs for this org (e.g. Byz platform / byz-agent) may pass userId+organizationId overrides.
     # Empty = allow overrides (local/dev), same idea as byz-search.
     admin-organization-id: ${BYZ_ADMIN_ORGANIZATION_ID:}
+  maxmind:
+    account-id: ${MAXMIND_ACCOUNT_ID:}
+    license-key: ${MAXMIND_LICENSE_KEY:}
+    base-url: ${MAXMIND_INSIGHTS_BASE_URL:https://geoip.maxmind.com}
+    error-retry-after: ${MAXMIND_ERROR_RETRY_AFTER:PT15M}

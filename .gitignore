@@ -7,3 +7,7 @@ target/
 .vscode/
 *.log
 .DS_Store
+application-secrets.yml
+.env
+.env.*
+!.env.example

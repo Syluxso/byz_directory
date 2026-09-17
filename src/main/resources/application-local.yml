@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:./application-secrets.yml
   datasource:
     url: jdbc:postgresql://127.0.0.1:5435/directory
     username: db

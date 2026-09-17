@@ -6,7 +6,8 @@ Org/user profiles, tenants (groups), membership, invites, and guided tasks. Orgs
 - DB: `docker compose up -d byz-directory-db` from `projects/db`
 - Deployed: `https://directory.byzantineapp.dev`
 - Auth: IAM JWT via JWKS (`organization_id` claim required for most routes)
-- Kafka: consumes **`byz.iam.user`** (`user.registered`, `user.authenticated`) to ensure/fill profiles (name/email gaps only). Toggle `BYZ_KAFKA_ENABLED`.
+- Kafka: consumes **`byz.iam.user`** (`user.registered`, `user.authenticated` for profile fill; `device.registered`, `device.ip_observed` for MaxMind IP intel). Toggle `BYZ_KAFKA_ENABLED`.
+- MaxMind Insights (optional): `MAXMIND_ACCOUNT_ID` + `MAXMIND_LICENSE_KEY`. `GET /api/v1/orgs/{orgId}/devices/{deviceId}/intel` returns `{ current, history }`.
 
 ## Guided tasks
 

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -229,5 +230,51 @@ public final class DirectoryDtos {
             Instant updatedAt,
             Instant completedAt,
             Instant dismissedAt
+    ) {}
+
+    public record DeviceIpIntelResponse(
+            UUID id,
+            UUID organizationId,
+            UUID userId,
+            UUID deviceId,
+            String ip,
+            String country,
+            String countryIso,
+            String continent,
+            String continentCode,
+            String region,
+            String city,
+            String postalCode,
+            Double latitude,
+            Double longitude,
+            Integer accuracyRadiusKm,
+            String timeZone,
+            Integer asn,
+            String asOrg,
+            String isp,
+            String organization,
+            String connectionType,
+            String userType,
+            Double staticIpScore,
+            Integer userCount,
+            Boolean anonymous,
+            Boolean anonymousVpn,
+            Boolean hosting,
+            Boolean publicProxy,
+            Boolean tor,
+            Boolean residentialProxy,
+            String mobileCountryCode,
+            String mobileNetworkCode,
+            Map<String, Object> rawJson,
+            String source,
+            String status,
+            Instant firstSeenAt,
+            Instant lastSeenAt,
+            Instant lookedUpAt
+    ) {}
+
+    public record DeviceIntelBundleResponse(
+            DeviceIpIntelResponse current,
+            List<DeviceIpIntelResponse> history
     ) {}
 }

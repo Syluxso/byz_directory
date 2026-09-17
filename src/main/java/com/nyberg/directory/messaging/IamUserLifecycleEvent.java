@@ -17,8 +17,13 @@ public record IamUserLifecycleEvent(
         String email,
         String displayName,
         String resetUrl,
-        String provider
+        String provider,
+        UUID deviceId,
+        String deviceLabel,
+        String deviceIp
 ) {
     public static final String TYPE_USER_REGISTERED = "user.registered";
     public static final String TYPE_USER_AUTHENTICATED = "user.authenticated";
+    public static final String TYPE_DEVICE_REGISTERED = "device.registered";
+    public static final String TYPE_DEVICE_IP_OBSERVED = "device.ip_observed";
 }
